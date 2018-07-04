@@ -1,7 +1,44 @@
 package fpinscala.laziness
 
 import Stream._
+
+
 trait Stream[+A] {
+
+  // ex1: Write a function to convert a Stream to a List
+
+  // This function will stack overflow
+  def toList1: List[A] = this match {
+    case Cons(h, t) => h() :: t().toList1
+    case _ => Nil
+  }
+
+  // This function will enqueue partial stream evaluations in a List.
+  // At the end we have to reverse the result
+  def toList2: List[A] = {
+    @annotation.tailrec
+    def loop(as: Stream[A], acc: List[A]): List[A] =
+      as match {
+        case Cons(h, t) => loop(t(), h() :: acc)
+        case _ => acc
+      }
+
+    loop(this, List[A]()).reverse
+  }
+
+  // Fastest solution: use a mutable buffer internally
+  def toList3: List[A] = {
+    val lb = collection.mutable.ListBuffer.empty[A]
+    @annotation.tailrec
+    def loop(as: Stream[A]): List[A] = as match {
+      case Cons(h, t) =>
+        lb += h()
+        loop(t())
+
+      case _ => lb.toList
+    }
+    loop(this)
+  }
 
   def foldRight[B](z: => B)(f: (A, => B) => B): B = // The arrow `=>` in front of the argument type `B` means that the function `f` takes its second argument by name and may choose not to evaluate it.
     this match {
@@ -45,7 +82,7 @@ object Stream {
   def empty[A]: Stream[A] = Empty
 
   def apply[A](as: A*): Stream[A] =
-    if (as.isEmpty) empty 
+    if (as.isEmpty) empty
     else cons(as.head, apply(as.tail: _*))
 
   val ones: Stream[Int] = Stream.cons(1, ones)
